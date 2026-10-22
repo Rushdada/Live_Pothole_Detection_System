@@ -38,7 +38,7 @@ VIBRATION_THRESHOLD_G = float(os.getenv("VIBRATION_THRESHOLD_G", 1.6))          
 COOLDOWN_SECONDS = float(os.getenv("COOLDOWN_SECONDS", 3.0))                         # Avoid multiple detections for single pothole
 
 # Web Server Configuration
-WEB_HOST = os.getenv("WEB_HOST", "127.0.0.1")
-WEB_PORT = int(os.getenv("WEB_PORT", 5000))
-DEBUG_MODE = os.getenv("DEBUG_MODE", "True").lower() in ("true", "1", "yes")
+WEB_HOST = os.getenv("WEB_HOST", "0.0.0.0")
+WEB_PORT = int(os.getenv("PORT", os.getenv("WEB_PORT", 5000)))
+DEBUG_MODE = os.getenv("DEBUG_MODE", "False").lower() in ("true", "1", "yes")
 

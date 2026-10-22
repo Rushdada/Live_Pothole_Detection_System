@@ -1,4 +1,4 @@
-﻿__pycache__/
+__pycache__/
 *.py[cod]
 .venv/
 venv/
@@ -6,3 +6,5 @@ venv/
 users.db
 *.sqlite3
 .ipynb_checkpoints/
+logs/email_outbox/*.html
+data/snapshots/*.jpg

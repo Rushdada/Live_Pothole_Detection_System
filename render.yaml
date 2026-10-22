@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: pothole-detection-alert
+    runtime: python
+    plan: free
+    buildCommand: pip install --upgrade pip && pip install -r requirements.txt
+    startCommand: gunicorn -w 2 -b 0.0.0.0:$PORT app:app
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: RECIPIENT_EMAIL
+        value: rushipapu456@gmail.com
+      - key: ENABLE_LIVE_EMAIL
+        value: "false"
+      - key: DEBUG_MODE
+        value: "false"
