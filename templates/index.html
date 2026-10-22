@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Pothole Detection & Geolocation Alert System</title>
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" rel="stylesheet">
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <!-- Leaflet Heatmap -->
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+
+    <!-- Navigation Header -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark-blue px-3 py-2 shadow-sm">
+        <div class="container-fluid">
+            <a class="navbar-brand d-flex align-items-center gap-2" href="#">
+                <span class="brand-icon"><i class="fa-solid fa-triangle-exclamation text-warning"></i></span>
+                <div>
+                    <div class="fw-bold fs-5">GeoPothole IoT Alert</div>
+                    <div class="subtitle text-muted-light">Automated Detection, GPS Geolocation & Email Alert System</div>
+                </div>
+            </a>
+
+            <div class="d-flex align-items-center gap-2 ms-auto flex-wrap">
+                <!-- Vehicle Simulation Controls -->
+                <button id="btnToggleSim" class="btn btn-outline-light btn-sm d-flex align-items-center gap-2">
+                    <i class="fa-solid fa-car-side"></i>
+                    <span id="simBtnText">Start Vehicle Drive</span>
+                </button>
+
+                <!-- Trigger Instant Pothole Modal Button -->
+                <div class="dropdown">
+                    <button class="btn btn-danger btn-sm dropdown-toggle d-flex align-items-center gap-1" type="button" data-bs-toggle="dropdown">
+                        <i class="fa-solid fa-bolt"></i> Trigger Pothole
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end shadow">
+                        <li><h6 class="dropdown-header">Simulate Road Bump/Hole</h6></li>
+                        <li><a class="dropdown-item text-danger" href="javascript:void(0)" onclick="triggerPothole('HIGH')"><i class="fa-solid fa-circle-exclamation me-1"></i> Severe Pothole (>10cm, >2.6g)</a></li>
+                        <li><a class="dropdown-item text-warning" href="javascript:void(0)" onclick="triggerPothole('MEDIUM')"><i class="fa-solid fa-triangle-exclamation me-1"></i> Moderate Pothole (7cm, 2.0g)</a></li>
+                        <li><a class="dropdown-item text-success" href="javascript:void(0)" onclick="triggerPothole('LOW')"><i class="fa-solid fa-info-circle me-1"></i> Minor Depression (4cm, 1.5g)</a></li>
+                    </ul>
+                </div>
+
+                <a href="/mobile" target="_blank" class="btn btn-warning btn-sm d-flex align-items-center gap-1 fw-bold text-dark">
+                    <i class="fa-solid fa-mobile-screen"></i> Launch Mobile App
+                </a>
+
+                <button class="btn btn-outline-light btn-sm" data-bs-toggle="modal" data-bs-target="#qrModal" onclick="loadQRCode()" title="Scan QR Code to open on Phone">
+                    <i class="fa-solid fa-qrcode"></i> Phone QR
+                </button>
+
+                <a href="/api/export/csv" class="btn btn-outline-success btn-sm d-flex align-items-center gap-1">
+                    <i class="fa-solid fa-file-csv"></i> Export CSV
+                </a>
+
+                <button class="btn btn-outline-info btn-sm" data-bs-toggle="modal" data-bs-target="#outboxModal" onclick="loadOutboxList()">
+                    <i class="fa-solid fa-envelope-open-text"></i> Email Outbox
+                </button>
+
+                <button class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#settingsModal" onclick="loadConfig()">
+                    <i class="fa-solid fa-gear"></i>
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Container -->
+    <div class="container-fluid py-3 px-4">
+
+        <!-- KPI Summary Cards -->
+        <div class="row g-3 mb-3">
+            <div class="col-xl-2 col-md-4 col-sm-6">
+                <div class="stat-card border-primary">
+                    <div class="stat-icon bg-primary-soft text-primary"><i class="fa-solid fa-road"></i></div>
+                    <div class="stat-content">
+                        <div class="stat-label">Total Potholes</div>
+                        <div class="stat-value" id="statTotal">0</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-xl-2 col-md-4 col-sm-6">
+                <div class="stat-card border-danger">
+                    <div class="stat-icon bg-danger-soft text-danger"><i class="fa-solid fa-circle-exclamation"></i></div>
+                    <div class="stat-content">
+                        <div class="stat-label">Severe Hazards</div>
+                        <div class="stat-value text-danger" id="statHigh">0</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-xl-2 col-md-4 col-sm-6">
+                <div class="stat-card border-warning">
+                    <div class="stat-icon bg-warning-soft text-warning"><i class="fa-solid fa-triangle-exclamation"></i></div>
+                    <div class="stat-content">
+                        <div class="stat-label">Moderate</div>
+                        <div class="stat-value text-warning" id="statMedium">0</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-xl-2 col-md-4 col-sm-6">
+                <div class="stat-card border-success">
+                    <div class="stat-icon bg-success-soft text-success"><i class="fa-solid fa-circle-check"></i></div>
+                    <div class="stat-content">
+                        <div class="stat-label">Low Severity</div>
+                        <div class="stat-value text-success" id="statLow">0</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-xl-2 col-md-4 col-sm-6">
+                <div class="stat-card border-info">
+                    <div class="stat-icon bg-info-soft text-info"><i class="fa-solid fa-envelope-circle-check"></i></div>
+                    <div class="stat-content">
+                        <div class="stat-label">Emails Dispatched</div>
+                        <div class="stat-value text-info" id="statEmails">0</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-xl-2 col-md-4 col-sm-6">
+                <div class="stat-card border-secondary">
+                    <div class="stat-icon bg-secondary-soft text-secondary"><i class="fa-solid fa-screwdriver-wrench"></i></div>
+                    <div class="stat-content">
+                        <div class="stat-label">Repaired / Resolved</div>
+                        <div class="stat-value" id="statRepaired">0</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Notification Banner / Alert Box -->
+        <div id="alertBanner" class="alert alert-dismissible fade show d-none" role="alert">
+            <span id="alertBannerText"></span>
+            <button type="button" class="btn-close" onclick="hideAlertBanner()"></button>
+        </div>
+
+        <!-- Main Workspace: Map & Live Telemetry -->
+        <div class="row g-3 mb-4">
+            <!-- Left: Interactive Leaflet Map -->
+            <div class="col-lg-8">
+                <div class="card h-100 shadow-sm border-0">
+                    <div class="card-header bg-white py-2 d-flex justify-content-between align-items-center">
+                        <div class="fw-bold d-flex align-items-center gap-2">
+                            <i class="fa-solid fa-map-location-dot text-primary"></i>
+                            <span>Live Road GIS Geolocation Map</span>
+                        </div>
+                        <div class="d-flex align-items-center gap-2">
+                            <span class="badge bg-danger">● Severe</span>
+                            <span class="badge bg-warning text-dark">● Moderate</span>
+                            <span class="badge bg-success">● Low</span>
+                            <button class="btn btn-outline-secondary btn-sm" onclick="centerMapOnVehicle()" title="Center on Vehicle">
+                                <i class="fa-solid fa-crosshairs"></i>
+                            </button>
+                            <button class="btn btn-outline-secondary btn-sm" onclick="refreshData()" title="Refresh Map">
+                                <i class="fa-solid fa-rotate-right"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body p-0 position-relative">
+                        <div id="map"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right: Real-time Telemetry & Edge Unit Status -->
+            <div class="col-lg-4">
+                <div class="card h-100 shadow-sm border-0">
+                    <div class="card-header bg-white py-2 d-flex justify-content-between align-items-center">
+                        <div class="fw-bold d-flex align-items-center gap-2">
+                            <i class="fa-solid fa-microchip text-primary"></i>
+                            <span>Vehicle Edge Telemetry</span>
+                        </div>
+                        <span id="hardwareStatusBadge" class="badge bg-success-soft text-success">
+                            <i class="fa-solid fa-circle fa-2xs"></i> Active
+                        </span>
+                    </div>
+                    <div class="card-body">
+                        <!-- Vehicle Coordinates Display -->
+                        <div class="coords-box mb-3 p-3 bg-light rounded-3 text-center">
+                            <div class="text-muted small fw-semibold">CURRENT GPS COORDINATES</div>
+                            <div class="fs-5 fw-bold font-monospace text-dark mt-1" id="telemetryCoords">
+                                12.971598° N, 77.594562° E
+                            </div>
+                            <div class="text-muted small" id="telemetrySpeed">Speed: 40.0 km/h</div>
+                        </div>
+
+                        <!-- Live Sensor Gauges -->
+                        <div class="row g-2 mb-3">
+                            <div class="col-6">
+                                <div class="sensor-box p-3 border rounded-3 text-center">
+                                    <div class="sensor-title text-muted small">ULTRASONIC DEPTH</div>
+                                    <div class="sensor-val fs-3 fw-bold text-primary mt-1" id="telemetryDepth">
+                                        0.0 <span class="fs-6 fw-normal text-muted">cm</span>
+                                    </div>
+                                    <div class="progress mt-2" style="height: 6px;">
+                                        <div id="depthProgressBar" class="progress-bar bg-primary" role="progressbar" style="width: 15%"></div>
+                                    </div>
+                                    <div class="small text-muted mt-1">Ground Drop</div>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="sensor-box p-3 border rounded-3 text-center">
+                                    <div class="sensor-title text-muted small">Z-AXIS VIBRATION</div>
+                                    <div class="sensor-val fs-3 fw-bold text-danger mt-1" id="telemetryVibration">
+                                        1.0 <span class="fs-6 fw-normal text-muted">g</span>
+                                    </div>
+                                    <div class="progress mt-2" style="height: 6px;">
+                                        <div id="vibProgressBar" class="progress-bar bg-danger" role="progressbar" style="width: 25%"></div>
+                                    </div>
+                                    <div class="small text-muted mt-1">Impact Shock</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Last Detected Incident Preview Card -->
+                        <div class="card border-0 bg-light-subtle rounded-3 p-3">
+                            <div class="fw-semibold text-secondary small mb-2 d-flex justify-content-between">
+                                <span>MOST RECENT DETECTION</span>
+                                <span id="lastDetectionTime" class="text-muted">--:--:--</span>
+                            </div>
+                            <div id="lastDetectionDetails" class="small">
+                                <div class="text-muted text-center py-3">
+                                    No pothole detected yet in this session.<br>
+                                    <span class="fst-italic">Drive vehicle or click "Trigger Pothole" above.</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Mini Charts Accordion -->
+                        <div class="mt-3">
+                            <div class="row g-2">
+                                <div class="col-6">
+                                    <div class="chart-wrapper p-2 border rounded-3">
+                                        <div class="chart-title text-center text-muted small fw-semibold">By Severity</div>
+                                        <div style="height: 120px; position: relative;">
+                                            <canvas id="severityChart"></canvas>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="chart-wrapper p-2 border rounded-3">
+                                        <div class="chart-title text-center text-muted small fw-semibold">Repair Status</div>
+                                        <div style="height: 120px; position: relative;">
+                                            <canvas id="statusChart"></canvas>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Pothole Incidents Table -->
+        <div class="card shadow-sm border-0 mb-4">
+            <div class="card-header bg-white py-3">
+                <div class="row g-2 align-items-center">
+                    <div class="col-md-4">
+                        <h5 class="mb-0 fw-bold d-flex align-items-center gap-2">
+                            <i class="fa-solid fa-list-check text-primary"></i>
+                            <span>Detected Pothole Records & Authority Reports</span>
+                        </h5>
+                    </div>
+                    <div class="col-md-8">
+                        <div class="d-flex align-items-center gap-2 justify-content-md-end flex-wrap">
+                            <div class="input-group input-group-sm" style="max-width: 200px;">
+                                <span class="input-group-text"><i class="fa-solid fa-filter"></i></span>
+                                <select id="filterSeverity" class="form-select" onchange="refreshData()">
+                                    <option value="">All Severities</option>
+                                    <option value="HIGH">High Severity</option>
+                                    <option value="MEDIUM">Medium Severity</option>
+                                    <option value="LOW">Low Severity</option>
+                                </select>
+                            </div>
+                            <div class="input-group input-group-sm" style="max-width: 200px;">
+                                <span class="input-group-text"><i class="fa-solid fa-tag"></i></span>
+                                <select id="filterStatus" class="form-select" onchange="refreshData()">
+                                    <option value="">All Statuses</option>
+                                    <option value="Pending">Pending</option>
+                                    <option value="In Progress">In Progress</option>
+                                    <option value="Repaired">Repaired</option>
+                                </select>
+                            </div>
+                            <button class="btn btn-outline-danger btn-sm" onclick="clearAllData()">
+                                <i class="fa-solid fa-trash-can"></i> Clear All
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0" id="potholesTable">
+                    <thead class="table-light text-uppercase text-secondary small">
+                        <tr>
+                            <th>ID</th>
+                            <th>Date & Time</th>
+                            <th>Severity</th>
+                            <th>GPS Coordinates</th>
+                            <th>Approx. Location</th>
+                            <th>Depth</th>
+                            <th>Impact</th>
+                            <th>Status</th>
+                            <th>Email Alert</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="potholeTableBody">
+                        <tr>
+                            <td colspan="10" class="text-center py-4 text-muted">
+                                Loading road condition records...
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Outbox Modal -->
+    <div class="modal fade" id="outboxModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold"><i class="fa-solid fa-envelope-open-text text-primary me-2"></i>Email Outbox & Dispatched Alerts</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-muted small">
+                        The alerts below have been generated and archived by the system. Click any alert to view the exact HTML email dispatched to the road maintenance authority:
+                    </p>
+                    <div class="list-group" id="outboxList">
+                        <div class="text-center py-3 text-muted">Loading outbox records...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div class="modal fade" id="settingsModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold"><i class="fa-solid fa-sliders text-primary me-2"></i>System & Email Settings</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="settingsForm">
+                        <div class="mb-3">
+                            <label class="form-label small fw-semibold">Authority Recipient Email</label>
+                            <input type="email" id="cfgRecipientEmail" class="form-control form-control-sm" readonly>
+                            <div class="form-text">Configured via <code>.env</code> file.</div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label small fw-semibold">SMTP Sender Email</label>
+                            <input type="text" id="cfgSenderEmail" class="form-control form-control-sm" readonly>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label small fw-semibold">Live SMTP Delivery Status</label>
+                            <div id="cfgLiveEmailBadge"></div>
+                            <div class="form-text">When disabled, all emails are logged directly into <code>logs/email_outbox/</code> for offline review.</div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label small fw-semibold">Hardware Serial COM Port</label>
+                            <input type="text" id="cfgSerialPort" class="form-control form-control-sm" readonly>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Phone QR Code Modal -->
+    <div class="modal fade" id="qrModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered modal-sm">
+            <div class="modal-content text-center p-3">
+                <div class="modal-header border-0 pb-0">
+                    <h5 class="modal-title fw-bold fs-6"><i class="fa-solid fa-mobile-screen text-primary me-2"></i>Open on Phone</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body py-2">
+                    <p class="small text-muted mb-2">Connect your phone to the same Wi-Fi and scan this QR code:</p>
+                    <div id="qrCodeContainer" class="p-2 border rounded-3 bg-light mb-2">
+                        <img id="qrCodeImg" src="" alt="Mobile App QR Code" style="max-width: 100%; height: auto;" />
+                    </div>
+                    <div class="small fw-bold text-primary font-monospace" id="mobileAppUrl"></div>
+                    <small class="text-muted d-block mt-1">Alerts Target: <strong>rushipapu456@gmail.com</strong></small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap 5 JS Bundle -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <!-- Custom Logic -->
+    <script src="/static/js/main.js"></script>
+</body>
+</html>
+
